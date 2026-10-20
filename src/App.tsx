@@ -1,3 +1,4 @@
+import type { Session } from '@supabase/supabase-js'
 import {
   addDays,
   format,
@@ -6,6 +7,7 @@ import {
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import AuthScreen from './components/AuthScreen'
 import MonthGrid from './components/MonthGrid'
 import PlanInput from './components/PlanInput'
 import TimeGrid from './components/TimeGrid'
@@ -61,6 +63,30 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(() =>
     document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
   )
+  const [session, setSession] = useState<Session | null>(null)
+  const [checkingAuth, setCheckingAuth] = useState(true)
+
+  const userId = session?.user.id ?? null
+
+  useEffect(() => {
+    let active = true
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
+      setSession(data.session)
+      setCheckingAuth(false)
+    })
+
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+      setSession(next)
+      setCheckingAuth(false)
+    })
+
+    return () => {
+      active = false
+      data.subscription.unsubscribe()
+    }
+  }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -72,6 +98,12 @@ export default function App() {
   }, [theme])
 
   const reload = useCallback(async () => {
+    if (!userId) {
+      setEvents([])
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     const { from, to } = visibleRange(view, cursor)
     const { data, error } = await supabase
@@ -88,7 +120,7 @@ export default function App() {
       setEvents((data ?? []) as CalendarEvent[])
     }
     setLoading(false)
-  }, [view, cursor])
+  }, [view, cursor, userId])
 
   useEffect(() => {
     void reload()
@@ -120,9 +152,16 @@ export default function App() {
   }, [view, cursor])
 
   async function handlePlan(text: string): Promise<number> {
+    if (!session) {
+      throw new Error('Tu sesión ha caducado. Vuelve a entrar.')
+    }
+
     const res = await fetch('/api/parse', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
       body: JSON.stringify({
         text,
         now: new Date().toISOString(),
@@ -142,7 +181,11 @@ export default function App() {
       throw new Error('No he encontrado ningún evento en ese texto.')
     }
 
-    const rows = drafts.map((d) => ({ ...d, source_text: text }))
+    const rows = drafts.map((d) => ({
+      ...d,
+      source_text: text,
+      user_id: session.user.id,
+    }))
     const { error } = await supabase.from(EVENTS_TABLE).insert(rows)
     if (error) throw new Error(error.message)
 
@@ -175,6 +218,21 @@ export default function App() {
     }
     await reload()
     setToast('Evento eliminado')
+  }
+
+  if (checkingAuth) {
+    return <div className="splash">Cargando…</div>
+  }
+
+  if (!session) {
+    return (
+      <AuthScreen
+        theme={theme}
+        onToggleTheme={() =>
+          setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
+        }
+      />
+    )
   }
 
   return (
@@ -227,6 +285,19 @@ export default function App() {
               {v === 'day' ? 'Día' : v === 'week' ? 'Semana' : 'Mes'}
             </button>
           ))}
+        </div>
+
+        <div className="userbox">
+          <span className="user-email" title={session.user.email ?? ''}>
+            {session.user.email}
+          </span>
+          <button
+            className="ghost"
+            onClick={() => void supabase.auth.signOut()}
+            title="Cerrar sesión"
+          >
+            Salir
+          </button>
         </div>
       </header>
 

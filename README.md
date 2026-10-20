@@ -17,6 +17,27 @@ la semana o el mes que corresponda.
 La función usa **Netlify AI Gateway**, que inyecta las credenciales del proveedor
 de IA automáticamente: no hay ninguna API key en el código ni en el repo.
 
+## Cuentas y privacidad
+
+Cada persona crea su cuenta con email y contraseña (Supabase Auth) y ve
+únicamente sus propios eventos. No hay cuentas compartidas ni un calendario
+global.
+
+- **Registro.** Abierto desde la pantalla de acceso («Crear cuenta»). Según la
+  configuración del proyecto, Supabase puede pedir confirmar el correo antes del
+  primer login; la app contempla los dos casos.
+- **Aislamiento.** La tabla `events` tiene `user_id` y cuatro políticas RLS
+  (`select`, `insert`, `update`, `delete`) que exigen `auth.uid() = user_id`.
+  Sin sesión, la API de Supabase devuelve una lista vacía; no hay forma de leer
+  eventos ajenos ni de insertar uno a nombre de otro (`with check` lo bloquea).
+- **La función también valida.** `POST /api/parse` comprueba el token del
+  usuario contra Supabase antes de llamar al modelo. Sin token responde `401`,
+  así que nadie puede usar el AI Gateway desde fuera.
+- **Cerrar sesión** está en la barra superior, junto al email.
+
+La clave *publishable* sigue siendo pública: la seguridad no depende de
+esconderla, sino de las políticas RLS.
+
 ## Tema claro y oscuro
 
 La interfaz tiene dos temas conmutables desde el botón de la barra superior.
@@ -82,7 +103,9 @@ src/
   components/TimeGrid.tsx    rejilla horaria (vistas día y semana)
   components/MonthGrid.tsx   vista mensual
   components/PlanInput.tsx   panel de texto libre
+  components/AuthScreen.tsx  acceso: entrar / crear cuenta
   lib/supabase.ts            cliente de Supabase
+  lib/auth.ts                traducción de los errores de Supabase Auth
   lib/dates.ts               utilidades de rango y zona horaria
   lib/layout.ts              reparto de columnas entre eventos solapados
 netlify/functions/
@@ -96,6 +119,7 @@ Tabla `public.events`:
 | Columna | Tipo | Notas |
 | --- | --- | --- |
 | `id` | uuid | PK, `gen_random_uuid()` |
+| `user_id` | uuid | dueño del evento; FK a `auth.users`, `on delete cascade` |
 | `title` | text | obligatorio |
 | `notes` | text | opcional |
 | `starts_at` | timestamptz | obligatorio |
@@ -123,6 +147,19 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 
 La clave *publishable* es pública por diseño; la seguridad real la da RLS.
 
+> **En producción las variables también tienen que estar en Netlify**, no solo
+> en tu `.env`. `npm run build` las lee del `.env` local y las incrusta en el
+> bundle, pero `parse-plan.ts` las lee en tiempo de ejecución para validar el
+> token. Si faltan, `/api/parse` responde `503`:
+>
+> ```bash
+> netlify env:set VITE_SUPABASE_URL "https://<ref>.supabase.co"
+> netlify env:set VITE_SUPABASE_PUBLISHABLE_KEY "sb_publishable_..."
+> ```
+>
+> Los cambios de variables no afectan a lo ya desplegado: hay que volver a
+> desplegar.
+
 > El AI Gateway solo funciona después de que el proyecto tenga al menos un deploy
 > de producción. En local, `netlify dev` lo tiene disponible tras ese primer
 > deploy.
@@ -136,10 +173,9 @@ npx netlify deploy --prod
 
 ## Pendiente / ideas
 
-- **Autenticación.** Ahora mismo las políticas RLS de `events` permiten
-  lectura y escritura a cualquiera con la clave publishable. Para uso personal
-  es aceptable, pero antes de guardar datos sensibles hay que activar Supabase
-  Auth y filtrar por `user_id`.
+- Recuperar contraseña y cambiar de email.
+- Borrar la cuenta (hoy se puede vaciar el calendario, pero no eliminar el
+  usuario desde la interfaz).
 - Editar eventos (ahora solo se crean y se borran).
 - Sugerir recolocación cuando hay solapamiento (mover el evento en vez de
   solo repartir el ancho).

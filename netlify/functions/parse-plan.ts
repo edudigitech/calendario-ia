@@ -23,6 +23,65 @@ interface Draft {
 
 const MODEL = process.env.AI_MODEL ?? 'gpt-5-mini'
 
+// Las variables están en el sitio como VITE_* (las usa el cliente); en las
+// funciones se leen igual porque Netlify expone todas las del sitio.
+const SUPABASE_URL =
+  process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
+const SUPABASE_KEY =
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.SUPABASE_ANON_KEY ??
+  ''
+
+type AuthResult = { ok: true } | { ok: false; status: number; error: string }
+
+/**
+ * Comprueba el token del usuario contra Supabase. Sin esto, cualquiera podría
+ * llamar a /api/parse y gastar el AI Gateway.
+ */
+async function verifyUser(req: Request): Promise<AuthResult> {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error('parse-plan: faltan VITE_SUPABASE_URL o la clave pública')
+    return {
+      ok: false,
+      status: 503,
+      error: 'El servidor no tiene configurada la verificación de sesión.',
+    }
+  }
+
+  const header = req.headers.get('authorization') ?? ''
+  if (!header.startsWith('Bearer ')) {
+    return { ok: false, status: 401, error: 'Tienes que iniciar sesión.' }
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: header },
+    })
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: 401,
+        error: 'Tu sesión no es válida o ha caducado.',
+      }
+    }
+    const user = (await res.json()) as { id?: string } | null
+    if (!user?.id) {
+      return {
+        ok: false,
+        status: 401,
+        error: 'Tu sesión no es válida o ha caducado.',
+      }
+    }
+    return { ok: true }
+  } catch {
+    return {
+      ok: false,
+      status: 502,
+      error: 'No he podido comprobar tu sesión. Inténtalo otra vez.',
+    }
+  }
+}
+
 function systemPrompt(now: string, tz: string): string {
   return `Convierte el texto del usuario en eventos de calendario.
 
@@ -88,6 +147,11 @@ function normalise(raw: unknown): Draft[] {
 export default async (req: Request, _context: Context) => {
   if (req.method !== 'POST') {
     return Response.json({ error: 'Método no permitido' }, { status: 405 })
+  }
+
+  const auth = await verifyUser(req)
+  if (!auth.ok) {
+    return Response.json({ error: auth.error }, { status: auth.status })
   }
 
   const body = (await req.json().catch(() => null)) as {

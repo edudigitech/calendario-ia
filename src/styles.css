@@ -673,6 +673,162 @@ button {
   line-height: 1.5;
 }
 
+/* ---------- acceso ---------- */
+
+.splash {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.auth {
+  position: relative;
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-theme {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 388px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.auth-card h1 {
+  margin: 2px 0 0;
+  font-size: 22px;
+  font-weight: 680;
+  letter-spacing: -0.025em;
+}
+
+.auth-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-sunken);
+  border-radius: 9px;
+}
+
+.auth-tabs button {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.auth-tabs button.active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.field input {
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.field input::placeholder {
+  color: var(--muted-soft);
+}
+
+.field input:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent-fg);
+}
+
+.auth-ok {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-soft);
+  border-radius: 8px;
+}
+
+.auth-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted-soft);
+}
+
+/* ---------- usuario ---------- */
+
+.userbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.user-email {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
 /* ---------- toast ---------- */
 
 .toast {
@@ -703,5 +859,9 @@ button {
 
   .segmented {
     margin-left: 0;
+  }
+
+  .user-email {
+    display: none;
   }
 }
