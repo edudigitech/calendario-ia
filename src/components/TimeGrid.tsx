@@ -9,6 +9,7 @@ import {
   formatTime,
   minutesFromMidnight,
 } from '../lib/dates'
+import { layoutOverlaps } from '../lib/layout'
 import type { CalendarEvent } from '../lib/types'
 
 interface Props {
@@ -89,12 +90,19 @@ export default function TimeGrid({ days, events, onSelect }: Props) {
           {days.map((day) => {
             const dayStart = startOfDay(day)
             const dayEnd = addDays(dayStart, 1)
-            const dayEvents = events.filter((e) => {
-              if (e.all_day) return false
-              const s = new Date(e.starts_at)
-              const en = new Date(e.ends_at)
-              return s < dayEnd && en > dayStart
-            })
+
+            const spans = events
+              .filter((e) => {
+                if (e.all_day) return false
+                return new Date(e.starts_at) < dayEnd && new Date(e.ends_at) > dayStart
+              })
+              .map((event) => ({
+                event,
+                start: clampMinutes(new Date(event.starts_at), dayStart, dayEnd),
+                end: clampMinutes(new Date(event.ends_at), dayStart, dayEnd),
+              }))
+
+            const laidOut = layoutOverlaps(spans)
 
             return (
               <div key={day.toISOString()} className="day-col">
@@ -115,25 +123,30 @@ export default function TimeGrid({ days, events, onSelect }: Props) {
                   />
                 )}
 
-                {dayEvents.map((e) => {
-                  const top =
-                    clampMinutes(new Date(e.starts_at), dayStart, dayEnd) *
-                    PX_PER_MINUTE
-                  const bottom =
-                    clampMinutes(new Date(e.ends_at), dayStart, dayEnd) *
-                    PX_PER_MINUTE
-                  const height = Math.max(bottom - top, 22)
+                {laidOut.map(({ item, column, columns }) => {
+                  const top = item.start * PX_PER_MINUTE
+                  const height = Math.max(
+                    (item.end - item.start) * PX_PER_MINUTE,
+                    22,
+                  )
+                  const share = 100 / columns
                   return (
                     <button
-                      key={e.id}
-                      className={`event cat-${e.category}`}
-                      style={{ top, height }}
-                      onClick={() => onSelect(e)}
-                      title={e.notes ?? e.title}
+                      key={item.event.id}
+                      className={`event cat-${item.event.category}`}
+                      style={{
+                        top,
+                        height,
+                        left: `calc(${column * share}% + 3px)`,
+                        width: `calc(${share}% - 6px)`,
+                      }}
+                      onClick={() => onSelect(item.event)}
+                      title={item.event.notes ?? item.event.title}
                     >
-                      <span className="event-title">{e.title}</span>
+                      <span className="event-title">{item.event.title}</span>
                       <span className="event-time">
-                        {formatTime(e.starts_at)} – {formatTime(e.ends_at)}
+                        {formatTime(item.event.starts_at)} –{' '}
+                        {formatTime(item.event.ends_at)}
                       </span>
                     </button>
                   )

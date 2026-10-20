@@ -29,6 +29,40 @@ Todos los colores viven en variables CSS en `src/styles.css`: el bloque `:root`
 define el tema claro y `html[data-theme='dark']` sobrescribe los tokens. Para
 retocar un color hay que cambiarlo una sola vez.
 
+## Eventos que se solapan
+
+Cuando dos o más eventos coinciden en el tiempo, no se dibujan uno encima de
+otro: la columna del día se reparte entre ellos, como en Google Calendar.
+
+El cálculo está en `src/lib/layout.ts` y tiene dos pasos.
+
+**1. Agrupar.** Los eventos se ordenan por hora de inicio y se agrupan por
+contacto: si uno empieza antes de que haya terminado el más largo del grupo
+anterior, entra en ese grupo. El contacto es transitivo, así que una cadena
+`A 8-10 → B 9-11 → C 10-12` forma un solo grupo aunque A y C no se toquen.
+
+**2. Repartir columnas.** Dentro de cada grupo, cada evento va a la primera
+columna que ya esté libre (la que terminó antes de que este empiece). Si no hay
+ninguna, se abre una columna nueva. Todos los eventos del grupo acaban con el
+mismo ancho: `1 / nº de columnas`.
+
+```
+  08:00   09:00   10:00   11:00
+  ┌───────┬───────┬───────┐
+  │   A   │   B   │   C   │   3 columnas, 33,3 % cada uno
+  └───────┴───────┴───────┘
+  ┌───────────────┐
+  │       D       │            D no coincide con nadie: 100 %
+  └───────────────┘
+```
+
+Reutilizar columnas importa: si un evento largo convive con dos cortos que no
+se pisan entre sí, los cortos comparten columna y el largo se queda con la otra,
+en vez de abrir tres huecos.
+
+El resultado se aplica como estilos en línea (`left` y `width` en `calc()`) en
+`TimeGrid.tsx`; el CSS ya no fija la posición de `.event`.
+
 ## Stack
 
 | Pieza | Tecnología |
@@ -50,6 +84,7 @@ src/
   components/PlanInput.tsx   panel de texto libre
   lib/supabase.ts            cliente de Supabase
   lib/dates.ts               utilidades de rango y zona horaria
+  lib/layout.ts              reparto de columnas entre eventos solapados
 netlify/functions/
   parse-plan.ts              texto libre → eventos (JSON)
 ```
@@ -106,6 +141,7 @@ npx netlify deploy --prod
   es aceptable, pero antes de guardar datos sensibles hay que activar Supabase
   Auth y filtrar por `user_id`.
 - Editar eventos (ahora solo se crean y se borran).
-- Detectar solapamientos y ofrecer recolocación.
+- Sugerir recolocación cuando hay solapamiento (mover el evento en vez de
+  solo repartir el ancho).
 - Vista de agenda (lista).
 - Recurrencia («todas las semanas»).

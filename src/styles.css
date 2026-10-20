@@ -384,8 +384,7 @@ button {
 
 .event {
   position: absolute;
-  left: 3px;
-  right: 3px;
+  /* left/width llegan inline: los calcula el reparto de solapamientos */
   border-radius: 7px;
   padding: 3px 7px;
   text-align: left;
