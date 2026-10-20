@@ -1,12 +1,41 @@
+/* ---------- tokens ---------- */
+
 :root {
+  color-scheme: light;
+
   --bg: #f4f5f8;
   --surface: #ffffff;
+  --surface-subtle: #fcfcfd;
+  --surface-hover: #fafbfc;
+  --surface-sunken: #f1f2f5;
+
   --ink: #15171c;
   --muted: #6b7280;
+  --muted-soft: #9ca3af;
+
   --line: #e5e7eb;
+  --line-soft: #f1f2f5;
+
   --accent: #4f46e5;
+  --accent-fg: #4f46e5;
   --accent-soft: #eef2ff;
-  --radius: 12px;
+  --accent-hover: #4338ca;
+  --on-accent: #ffffff;
+
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+  --danger-line: #fecaca;
+  --disabled: #c7c9d9;
+
+  --toast-bg: #111827;
+  --toast-ink: #ffffff;
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.22);
+
+  --event-edge: rgba(0, 0, 0, 0.18);
+  --outside-num: #b6bcc6;
+  --now: #ef4444;
 
   --cat-trabajo: #2563eb;
   --cat-personal: #db2777;
@@ -15,10 +44,59 @@
   --cat-ocio: #d97706;
   --cat-otro: #64748b;
 
+  --radius: 12px;
+
   font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
   color: var(--ink);
   background: var(--bg);
 }
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0e1014;
+  --surface: #16181e;
+  --surface-subtle: #1a1d24;
+  --surface-hover: #1e222a;
+  --surface-sunken: #22262f;
+
+  --ink: #e8eaed;
+  --muted: #98a0ac;
+  --muted-soft: #6b7280;
+
+  --line: #272c35;
+  --line-soft: #1f242c;
+
+  --accent: #4f46e5;
+  --accent-fg: #a5b4fc;
+  --accent-soft: rgba(129, 140, 248, 0.16);
+  --accent-hover: #4338ca;
+  --on-accent: #ffffff;
+
+  --danger: #fca5a5;
+  --danger-bg: rgba(220, 38, 38, 0.12);
+  --danger-line: rgba(248, 113, 113, 0.32);
+  --disabled: #3a4250;
+
+  --toast-bg: #e8eaed;
+  --toast-ink: #13161b;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
+
+  --event-edge: rgba(0, 0, 0, 0.32);
+  --outside-num: #565e6b;
+  --now: #f87171;
+
+  --cat-trabajo: #3b82f6;
+  --cat-personal: #ec4899;
+  --cat-estudio: #8b5cf6;
+  --cat-salud: #10b981;
+  --cat-ocio: #f59e0b;
+  --cat-otro: #64748b;
+}
+
+/* ---------- base ---------- */
 
 * {
   box-sizing: border-box;
@@ -33,6 +111,8 @@ body,
 
 body {
   -webkit-font-smoothing: antialiased;
+  background: var(--bg);
+  color: var(--ink);
 }
 
 button {
@@ -95,20 +175,23 @@ button {
 }
 
 .ghost:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: var(--surface-hover);
+  border-color: var(--muted-soft);
 }
 
 .ghost.icon {
-  padding: 6px 10px;
+  padding: 6px 9px;
   font-size: 15px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .segmented {
   margin-left: auto;
   display: flex;
-  background: #f1f2f5;
+  background: var(--surface-sunken);
   border-radius: 9px;
   padding: 3px;
   gap: 2px;
@@ -125,7 +208,7 @@ button {
 .segmented button.active {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .layout {
@@ -187,7 +270,7 @@ button {
 }
 
 .timegrid-head {
-  background: #fcfcfd;
+  background: var(--surface-subtle);
 }
 
 .day-head {
@@ -211,7 +294,7 @@ button {
 }
 
 .day-head.is-today .day-num {
-  color: var(--accent);
+  color: var(--accent-fg);
 }
 
 .gutter {
@@ -219,7 +302,7 @@ button {
 }
 
 .timegrid-allday {
-  background: #fcfcfd;
+  background: var(--surface-subtle);
   max-height: 96px;
   overflow-y: auto;
 }
@@ -275,7 +358,7 @@ button {
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1px solid #f1f2f5;
+  border-top: 1px solid var(--line-soft);
 }
 
 .now-line {
@@ -283,7 +366,7 @@ button {
   left: 0;
   right: 0;
   height: 2px;
-  background: #ef4444;
+  background: var(--now);
   z-index: 3;
   pointer-events: none;
 }
@@ -296,7 +379,7 @@ button {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ef4444;
+  background: var(--now);
 }
 
 .event {
@@ -311,7 +394,7 @@ button {
   line-height: 1.25;
   color: #fff;
   background: var(--cat-otro);
-  border-left: 3px solid rgba(0, 0, 0, 0.18);
+  border-left: 3px solid var(--event-edge);
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -320,7 +403,7 @@ button {
 }
 
 .event:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.12);
 }
 
 .event-title {
@@ -349,7 +432,7 @@ button {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   border-bottom: 1px solid var(--line);
-  background: #fcfcfd;
+  background: var(--surface-subtle);
 }
 
 .monthgrid-dow {
@@ -381,20 +464,20 @@ button {
 }
 
 .monthcell:hover {
-  background: #fafbfc;
+  background: var(--surface-hover);
 }
 
 .monthcell.is-outside {
-  background: #fbfbfc;
+  background: var(--surface-subtle);
 }
 
 .monthcell.is-outside .monthcell-num {
-  color: #b6bcc6;
+  color: var(--outside-num);
 }
 
 .monthcell.is-today .monthcell-num {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-radius: 50%;
   width: 20px;
   height: 20px;
@@ -440,7 +523,7 @@ button {
 }
 
 .chip:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.12);
 }
 
 .chip-time {
@@ -513,12 +596,16 @@ button {
   font-size: 13.5px;
   line-height: 1.5;
   color: var(--ink);
-  background: #fcfcfd;
+  background: var(--surface-subtle);
+}
+
+.panel textarea::placeholder {
+  color: var(--muted-soft);
 }
 
 .panel textarea:focus {
   outline: 2px solid var(--accent-soft);
-  border-color: var(--accent);
+  border-color: var(--accent-fg);
 }
 
 .examples {
@@ -538,14 +625,14 @@ button {
 }
 
 .example:hover {
-  border-color: #c7cbd4;
+  border-color: var(--muted-soft);
   color: var(--ink);
-  background: #fafbfc;
+  background: var(--surface-hover);
 }
 
 .primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   padding: 10px 14px;
   border-radius: 9px;
   font-weight: 600;
@@ -554,20 +641,20 @@ button {
 }
 
 .primary:hover:not(:disabled) {
-  background: #4338ca;
+  background: var(--accent-hover);
 }
 
 .primary:disabled {
-  background: #c7c9d9;
+  background: var(--disabled);
   cursor: not-allowed;
 }
 
 .panel-error {
   margin: 0;
   font-size: 12.5px;
-  color: #b91c1c;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-line);
   border-radius: 8px;
   padding: 8px 10px;
   line-height: 1.4;
@@ -575,7 +662,7 @@ button {
 
 .kbd-hint {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--muted-soft);
   text-align: center;
 }
 
@@ -594,12 +681,12 @@ button {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: #111827;
-  color: #fff;
+  background: var(--toast-bg);
+  color: var(--toast-ink);
   padding: 10px 18px;
   border-radius: 999px;
   font-size: 13px;
-  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.22);
+  box-shadow: var(--shadow-md);
   z-index: 50;
 }
 
@@ -613,5 +700,9 @@ button {
 
   .side {
     overflow: visible;
+  }
+
+  .segmented {
+    margin-left: 0;
   }
 }

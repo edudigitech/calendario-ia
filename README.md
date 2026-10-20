@@ -17,6 +17,18 @@ la semana o el mes que corresponda.
 La función usa **Netlify AI Gateway**, que inyecta las credenciales del proveedor
 de IA automáticamente: no hay ninguna API key en el código ni en el repo.
 
+## Tema claro y oscuro
+
+La interfaz tiene dos temas conmutables desde el botón de la barra superior.
+Al arrancar se respeta `prefers-color-scheme` del sistema; en cuanto eliges uno,
+se guarda en `localStorage` y se mantiene entre visitas. El tema se aplica con
+`data-theme` en `<html>` y un script inline en `index.html` antes del primer
+pintado, para que no haya destello blanco al cargar en oscuro.
+
+Todos los colores viven en variables CSS en `src/styles.css`: el bloque `:root`
+define el tema claro y `html[data-theme='dark']` sobrescribe los tokens. Para
+retocar un color hay que cambiarlo una sola vez.
+
 ## Stack
 
 | Pieza | Tecnología |
