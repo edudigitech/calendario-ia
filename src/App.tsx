@@ -8,12 +8,18 @@ import {
 import { es } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AuthScreen from './components/AuthScreen'
+import EventDialog from './components/EventDialog'
 import MonthGrid from './components/MonthGrid'
 import PlanInput from './components/PlanInput'
 import TimeGrid from './components/TimeGrid'
 import { WEEK_OPTS, shiftCursor, timeZone, visibleRange } from './lib/dates'
 import { EVENTS_TABLE, supabase } from './lib/supabase'
-import type { CalendarEvent, EventDraft, ViewMode } from './lib/types'
+import type {
+  CalendarEvent,
+  EventDraft,
+  EventUpdate,
+  ViewMode,
+} from './lib/types'
 
 type Theme = 'light' | 'dark'
 
@@ -65,6 +71,7 @@ export default function App() {
   )
   const [session, setSession] = useState<Session | null>(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
+  const [editing, setEditing] = useState<CalendarEvent | null>(null)
 
   const userId = session?.user.id ?? null
 
@@ -206,16 +213,33 @@ export default function App() {
     return drafts.length
   }
 
-  async function removeEvent(event: CalendarEvent) {
-    if (!window.confirm(`¿Eliminar "${event.title}"?`)) return
+  async function saveEvent(id: string, patch: EventUpdate) {
+    const { error } = await supabase
+      .from(EVENTS_TABLE)
+      .update(patch)
+      .eq('id', id)
+    if (error) throw new Error(`No se pudo guardar: ${error.message}`)
+
+    // Si la nueva fecha se sale de la vista, salta hasta ella para no perderla.
+    const range = visibleRange(view, cursor)
+    const when = new Date(patch.starts_at).getTime()
+    if (when < range.from.getTime() || when >= range.to.getTime()) {
+      setCursor(new Date(when))
+    }
+
+    setEditing(null)
+    await reload()
+    setToast('Evento actualizado')
+  }
+
+  async function deleteEvent(event: CalendarEvent) {
     const { error } = await supabase
       .from(EVENTS_TABLE)
       .delete()
       .eq('id', event.id)
-    if (error) {
-      setToast(`Error al eliminar: ${error.message}`)
-      return
-    }
+    if (error) throw new Error(`No se pudo eliminar: ${error.message}`)
+
+    setEditing(null)
     await reload()
     setToast('Evento eliminado')
   }
@@ -310,14 +334,14 @@ export default function App() {
             <MonthGrid
               cursor={cursor}
               events={events}
-              onSelectEvent={removeEvent}
+              onSelectEvent={setEditing}
               onSelectDay={(day) => {
                 setCursor(day)
                 setView('day')
               }}
             />
           ) : (
-            <TimeGrid days={days} events={events} onSelect={removeEvent} />
+            <TimeGrid days={days} events={events} onSelect={setEditing} />
           )}
 
           {!loading && events.length === 0 && (
@@ -331,10 +355,20 @@ export default function App() {
         <aside className="side">
           <PlanInput onSubmit={handlePlan} />
           <p className="tip">
-            Consejo: pulsa un evento del calendario para eliminarlo.
+            Consejo: pulsa un evento para cambiar el nombre, la fecha o la hora.
           </p>
         </aside>
       </div>
+
+      {editing && (
+        <EventDialog
+          key={editing.id}
+          event={editing}
+          onClose={() => setEditing(null)}
+          onSave={saveEvent}
+          onDelete={deleteEvent}
+        />
+      )}
 
       {toast && <div className="toast">{toast}</div>}
     </div>

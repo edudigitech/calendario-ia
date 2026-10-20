@@ -774,7 +774,9 @@ button {
   color: var(--muted);
 }
 
-.field input {
+.field input,
+.field select,
+.field textarea {
   padding: 9px 11px;
   font: inherit;
   font-size: 13.5px;
@@ -784,13 +786,43 @@ button {
   border-radius: 9px;
 }
 
-.field input::placeholder {
+.field textarea {
+  min-height: 54px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.field input:disabled {
+  opacity: 0.45;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
   color: var(--muted-soft);
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
   outline: 2px solid var(--accent-soft);
   border-color: var(--accent-fg);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .auth-ok {
@@ -827,6 +859,93 @@ button {
   white-space: nowrap;
   font-size: 12.5px;
   color: var(--muted);
+}
+
+/* ---------- diálogo de evento ---------- */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(8, 10, 14, 0.55);
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modal-actions .spacer {
+  flex: 1;
+}
+
+.danger-quiet {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--danger);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.danger-quiet:hover:not(:disabled) {
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+}
+
+.danger {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-line);
+  border-radius: 8px;
+}
+
+.danger:hover:not(:disabled) {
+  filter: brightness(0.97);
 }
 
 /* ---------- toast ---------- */

@@ -23,4 +23,10 @@ export interface CalendarEvent {
 
 export type EventDraft = Omit<CalendarEvent, 'id' | 'created_at'>
 
+/** Campos que se pueden editar desde el diálogo de evento. */
+export type EventUpdate = Pick<
+  CalendarEvent,
+  'title' | 'notes' | 'starts_at' | 'ends_at' | 'all_day' | 'category'
+>
+
 export type ViewMode = 'day' | 'week' | 'month'

@@ -84,6 +84,25 @@ en vez de abrir tres huecos.
 El resultado se aplica como estilos en línea (`left` y `width` en `calc()`) en
 `TimeGrid.tsx`; el CSS ya no fija la posición de `.event`.
 
+## Editar eventos
+
+Pulsar un evento (en la rejilla horaria o en la vista mensual) abre un diálogo
+para cambiar el nombre, la fecha y la hora de inicio y fin, marcar «todo el
+día», la categoría y las notas. Antes, pulsar un evento lo borraba directamente;
+ahora el borrado vive dentro del diálogo y pide una segunda confirmación.
+
+Detalles que se notan poco:
+
+- Las fechas se manejan en hora local y se convierten a UTC al guardar, igual
+  que hace el parser. Un evento de las 16:00 se guarda como 14:00Z en verano y
+  se vuelve a ver a las 16:00.
+- Con «todo el día» se guarda de 00:00:00 a 23:59:59.999 local, lo mismo que
+  hace la IA cuando el texto no trae hora.
+- Si el evento se mueve fuera del periodo visible, la vista salta a la nueva
+  fecha en vez de dejar que desaparezca.
+- El diálogo se cierra con `Escape` o pulsando fuera, y el foco arranca en el
+  nombre.
+
 ## Stack
 
 | Pieza | Tecnología |
@@ -104,6 +123,7 @@ src/
   components/MonthGrid.tsx   vista mensual
   components/PlanInput.tsx   panel de texto libre
   components/AuthScreen.tsx  acceso: entrar / crear cuenta
+  components/EventDialog.tsx edición de un evento (nombre, fecha, hora…)
   lib/supabase.ts            cliente de Supabase
   lib/auth.ts                traducción de los errores de Supabase Auth
   lib/dates.ts               utilidades de rango y zona horaria
@@ -176,7 +196,7 @@ npx netlify deploy --prod
 - Recuperar contraseña y cambiar de email.
 - Borrar la cuenta (hoy se puede vaciar el calendario, pero no eliminar el
   usuario desde la interfaz).
-- Editar eventos (ahora solo se crean y se borran).
+- Arrastrar eventos para moverlos, en vez de editar la fecha a mano.
 - Sugerir recolocación cuando hay solapamiento (mover el evento en vez de
   solo repartir el ancho).
 - Vista de agenda (lista).
