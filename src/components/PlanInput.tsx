@@ -8,22 +8,28 @@ const EXAMPLES = [
 
 interface Props {
   onSubmit: (text: string) => Promise<number>
+  credits: number | null
+  onBuy: () => void
 }
 
-export default function PlanInput({ onSubmit }: Props) {
+export default function PlanInput({ onSubmit, credits, onBuy }: Props) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [noCredits, setNoCredits] = useState(false)
 
   async function submit() {
     const trimmed = text.trim()
     if (!trimmed || busy) return
     setBusy(true)
     setError(null)
+    setNoCredits(false)
     try {
       await onSubmit(trimmed)
       setText('')
     } catch (e) {
+      const code = (e as { code?: string }).code
+      setNoCredits(code === 'sin_creditos')
       setError(e instanceof Error ? e.message : 'No se pudo interpretar el texto')
     } finally {
       setBusy(false)
@@ -57,14 +63,29 @@ export default function PlanInput({ onSubmit }: Props) {
 
       {error && <p className="panel-error">{error}</p>}
 
-      <button
-        className="primary"
-        onClick={submit}
-        disabled={busy || text.trim().length === 0}
-      >
-        {busy ? 'Organizando…' : 'Organizar mi planning'}
-      </button>
-      <span className="kbd-hint">Ctrl + Enter</span>
+      {noCredits ? (
+        <button className="primary" onClick={onBuy}>
+          Comprar más análisis
+        </button>
+      ) : (
+        <button
+          className="primary"
+          onClick={submit}
+          disabled={busy || text.trim().length === 0}
+        >
+          {busy ? 'Organizando…' : 'Organizar mi planning'}
+        </button>
+      )}
+
+      <div className="credits-line">
+        <span className="kbd-hint">Ctrl + Enter</span>
+        <span className={credits === 0 ? 'credits-empty' : undefined}>
+          {credits === null ? '…' : credits} análisis
+        </span>
+        <button type="button" className="link" onClick={onBuy}>
+          Comprar
+        </button>
+      </div>
     </div>
   )
 }

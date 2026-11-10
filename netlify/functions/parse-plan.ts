@@ -1,5 +1,6 @@
 import type { Config, Context } from '@netlify/functions'
 import OpenAI from 'openai'
+import { adminClient, verifyUser } from '../lib/auth'
 
 const CATEGORIES = [
   'trabajo',
@@ -22,65 +23,6 @@ interface Draft {
 }
 
 const MODEL = process.env.AI_MODEL ?? 'gpt-5-mini'
-
-// Las variables están en el sitio como VITE_* (las usa el cliente); en las
-// funciones se leen igual porque Netlify expone todas las del sitio.
-const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
-const SUPABASE_KEY =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.SUPABASE_ANON_KEY ??
-  ''
-
-type AuthResult = { ok: true } | { ok: false; status: number; error: string }
-
-/**
- * Comprueba el token del usuario contra Supabase. Sin esto, cualquiera podría
- * llamar a /api/parse y gastar el AI Gateway.
- */
-async function verifyUser(req: Request): Promise<AuthResult> {
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('parse-plan: faltan VITE_SUPABASE_URL o la clave pública')
-    return {
-      ok: false,
-      status: 503,
-      error: 'El servidor no tiene configurada la verificación de sesión.',
-    }
-  }
-
-  const header = req.headers.get('authorization') ?? ''
-  if (!header.startsWith('Bearer ')) {
-    return { ok: false, status: 401, error: 'Tienes que iniciar sesión.' }
-  }
-
-  try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: header },
-    })
-    if (!res.ok) {
-      return {
-        ok: false,
-        status: 401,
-        error: 'Tu sesión no es válida o ha caducado.',
-      }
-    }
-    const user = (await res.json()) as { id?: string } | null
-    if (!user?.id) {
-      return {
-        ok: false,
-        status: 401,
-        error: 'Tu sesión no es válida o ha caducado.',
-      }
-    }
-    return { ok: true }
-  } catch {
-    return {
-      ok: false,
-      status: 502,
-      error: 'No he podido comprobar tu sesión. Inténtalo otra vez.',
-    }
-  }
-}
 
 function systemPrompt(now: string, tz: string): string {
   return `Convierte el texto del usuario en eventos de calendario.
@@ -154,6 +96,15 @@ export default async (req: Request, _context: Context) => {
     return Response.json({ error: auth.error }, { status: auth.status })
   }
 
+  const admin = adminClient()
+  if (!admin) {
+    // Sin service_role no se pueden descontar análisis. Se avisa en los logs y
+    // la app sigue funcionando en modo gratuito hasta que se configure.
+    console.error(
+      'parse-plan: falta SUPABASE_SERVICE_ROLE_KEY; no se descuentan análisis',
+    )
+  }
+
   const body = (await req.json().catch(() => null)) as {
     text?: string
     now?: string
@@ -175,6 +126,49 @@ export default async (req: Request, _context: Context) => {
     )
   }
 
+  // Se cobra antes de llamar al modelo: si no hay saldo, no se gasta dinero.
+  // La función de Postgres bloquea la fila, así que dos peticiones a la vez no
+  // pueden colarse con el último crédito.
+  let remaining: number | null = null
+
+  if (admin) {
+    const { data, error } = await admin.rpc('consume_ai_credit', {
+      p_user_id: auth.userId,
+    })
+
+    if (error) {
+      console.error('parse-plan: consume_ai_credit falló:', error.message)
+      return Response.json(
+        { error: 'No he podido comprobar tus análisis. Inténtalo otra vez.' },
+        { status: 500 },
+      )
+    }
+
+    if (typeof data !== 'number' || data < 0) {
+      return Response.json(
+        {
+          error:
+            'Te has quedado sin análisis. Compra un pack para seguir organizando planes.',
+          code: 'sin_creditos',
+        },
+        { status: 402 },
+      )
+    }
+
+    remaining = data
+  }
+
+  /** Si la llamada al modelo falla, el análisis no se cobra. */
+  async function refund(): Promise<void> {
+    if (!admin) return
+    const { error } = await admin.rpc('refund_ai_credit', {
+      p_user_id: auth.userId,
+    })
+    if (error) {
+      console.error('parse-plan: no se pudo devolver el crédito:', error.message)
+    }
+  }
+
   const now = body?.now ?? new Date().toISOString()
   const tz = body?.timeZone ?? 'Europe/Madrid'
 
@@ -191,6 +185,7 @@ export default async (req: Request, _context: Context) => {
 
     const content = completion.choices[0]?.message?.content
     if (!content) {
+      await refund()
       return Response.json(
         { error: 'El modelo no devolvió contenido' },
         { status: 502 },
@@ -198,10 +193,11 @@ export default async (req: Request, _context: Context) => {
     }
 
     const events = normalise(JSON.parse(content))
-    return Response.json({ events, model: completion.model })
+    return Response.json({ events, model: completion.model, credits: remaining })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('parse-plan failed:', message)
+    await refund()
     return Response.json({ error: message }, { status: 500 })
   }
 }

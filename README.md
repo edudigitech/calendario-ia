@@ -103,6 +103,34 @@ Detalles que se notan poco:
 - El diálogo se cierra con `Escape` o pulsando fuera, y el foco arranca en el
   nombre.
 
+## Análisis y pagos
+
+Cada planning que organiza la IA gasta un análisis. Al registrarse, cada cuenta
+recibe 10 de bienvenida; cuando se acaban se compra un pack de 100 por 4,99 €
+(pago único, sin suscripción).
+
+- **El saldo lo manda el servidor.** `POST /api/parse` descuenta el análisis en
+  Postgres *antes* de llamar al modelo, con `consume_ai_credit`, que bloquea la
+  fila: dos peticiones simultáneas no pueden gastar el mismo crédito. Si el
+  modelo falla, `refund_ai_credit` lo devuelve.
+- **Sin saldo**, la función responde `402` con `code: "sin_creditos"` y la
+  interfaz cambia el botón por «Comprar más análisis». El navegador nunca escribe
+  el saldo: esas tablas solo tienen política de lectura (RLS).
+- **El pago** usa Stripe Checkout alojado, creado en `POST /api/checkout` a
+  partir del JWT del usuario. El `user_id` viaja en `client_reference_id` y en
+  `metadata`, nunca como dato que mande el cliente.
+- **Los créditos los entrega el webhook**, no la página de éxito. Si el usuario
+  cierra la pestaña justo después de pagar, los recibe igual.
+  `POST /api/stripe-webhook` verifica la firma sobre el cuerpo crudo, exige
+  `payment_status !== 'unpaid'` (métodos de confirmación diferida) y llama a
+  `grant_credits`, que es idempotente gracias al índice único sobre
+  `stripe_session_id`: Stripe reintenta los webhooks y nadie cobra dos veces.
+- No se pasa `payment_method_types`: así Stripe elige los métodos disponibles
+  (tarjeta, Apple Pay, Google Pay, Bizum…) según el país y la moneda.
+
+La clave secreta de Stripe y la `service_role` de Supabase viven solo en el
+entorno de Netlify. El bundle que baja al navegador no contiene ninguna.
+
 ## Stack
 
 | Pieza | Tecnología |
@@ -124,12 +152,19 @@ src/
   components/PlanInput.tsx   panel de texto libre
   components/AuthScreen.tsx  acceso: entrar / crear cuenta
   components/EventDialog.tsx edición de un evento (nombre, fecha, hora…)
+  components/CreditsDialog.tsx pack de análisis y salto a Stripe
   lib/supabase.ts            cliente de Supabase
   lib/auth.ts                traducción de los errores de Supabase Auth
+  lib/credits.ts             saldo y creación del Checkout
   lib/dates.ts               utilidades de rango y zona horaria
   lib/layout.ts              reparto de columnas entre eventos solapados
+netlify/lib/
+  auth.ts                    verificar JWT + cliente con service_role
+  stripe.ts                  cliente de Stripe y precio del pack
 netlify/functions/
-  parse-plan.ts              texto libre → eventos (JSON)
+  parse-plan.ts              texto libre → eventos (JSON), descuenta análisis
+  create-checkout.ts         abre una Checkout Session para el pack
+  stripe-webhook.ts          entrega los créditos al confirmarse el pago
 ```
 
 ## Base de datos
@@ -149,6 +184,19 @@ Tabla `public.events`:
 | `source_text` | text | el texto original del que salió el evento |
 | `created_at` | timestamptz | por defecto `now()` |
 
+Tablas de créditos y pagos:
+
+| Tabla | Qué guarda |
+| --- | --- |
+| `public.credit_balances` | una fila por usuario con su saldo actual |
+| `public.credit_ledger` | cada movimiento (`signup_bonus`, `purchase`, `ai_parse`, `refund`); el saldo se puede reconstruir sumando |
+| `public.purchases` | cada Checkout cobrado, con `stripe_session_id` único |
+
+Las tres tienen RLS de solo lectura para el dueño. Escribir solo pueden las
+funciones `security definer` (`grant_credits`, `consume_ai_credit`,
+`refund_ai_credit`), y solo las ejecuta `service_role`. Un usuario no puede
+regalarse créditos llamando a la API de Supabase.
+
 ## Desarrollo local
 
 ```bash
@@ -165,7 +213,19 @@ VITE_SUPABASE_URL=https://<ref>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
+Para cobrar hacen falta además, **solo en el entorno de Netlify** (nunca en el
+`.env` ni en el repo):
+
+```
+STRIPE_SECRET_KEY=rk_test_...          # o rkcs_test_... de un sandbox
+STRIPE_WEBHOOK_SECRET=whsec_...        # el del endpoint /api/stripe-webhook
+STRIPE_PRICE_CREDITS=price_...         # precio del pack, creado en Stripe
+STRIPE_CREDITS_PER_PACK=100            # opcional; por defecto 100
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_... # escribir créditos desde el webhook
+```
+
 La clave *publishable* es pública por diseño; la seguridad real la da RLS.
+Las tres últimas no: son secretos de servidor.
 
 > **En producción las variables también tienen que estar en Netlify**, no solo
 > en tu `.env`. `npm run build` las lee del `.env` local y las incrusta en el

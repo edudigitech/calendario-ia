@@ -8,10 +8,12 @@ import {
 import { es } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AuthScreen from './components/AuthScreen'
+import CreditsDialog from './components/CreditsDialog'
 import EventDialog from './components/EventDialog'
 import MonthGrid from './components/MonthGrid'
 import PlanInput from './components/PlanInput'
 import TimeGrid from './components/TimeGrid'
+import { fetchCredits } from './lib/credits'
 import { WEEK_OPTS, shiftCursor, timeZone, visibleRange } from './lib/dates'
 import { EVENTS_TABLE, supabase } from './lib/supabase'
 import type {
@@ -72,6 +74,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
+  const [credits, setCredits] = useState<number | null>(null)
+  const [buyOpen, setBuyOpen] = useState(false)
 
   const userId = session?.user.id ?? null
 
@@ -103,6 +107,60 @@ export default function App() {
       /* modo privado: se ignora */
     }
   }, [theme])
+
+  useEffect(() => {
+    if (!userId) {
+      setCredits(null)
+      return
+    }
+    void fetchCredits(userId)
+      .then(setCredits)
+      .catch((error) => console.error('No se pudo leer el saldo:', error))
+  }, [userId])
+
+  // Vuelta desde Stripe: el webhook es quien entrega los créditos, así que a
+  // veces hay que esperar un par de segundos a que lleguen.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const outcome = params.get('checkout')
+    if (!outcome) return
+
+    // Limpia la URL para que recargar no repita el aviso.
+    window.history.replaceState({}, '', window.location.pathname)
+
+    if (!userId) return
+
+    if (outcome === 'cancel') {
+      setToast('Pago cancelado. No se ha cobrado nada.')
+      return
+    }
+    if (outcome !== 'ok') return
+
+    let cancelled = false
+    setToast('Confirmando el pago…')
+
+    void (async () => {
+      let latest: number | null = null
+      for (let i = 0; i < 4 && !cancelled; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        const next = await fetchCredits(userId).catch(() => null)
+        if (next !== null) {
+          latest = next
+          setCredits(next)
+        }
+      }
+      if (cancelled) return
+      setToast(
+        latest === null
+          ? 'Pago recibido. Recarga la página si no ves los análisis.'
+          : `Pago completado. Tienes ${latest} análisis.`,
+      )
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   const reload = useCallback(async () => {
     if (!userId) {
@@ -179,9 +237,19 @@ export default function App() {
     const json = (await res.json()) as {
       events?: EventDraft[]
       error?: string
+      code?: string
+      credits?: number
     }
 
-    if (!res.ok) throw new Error(json.error ?? 'Error del servidor')
+    if (!res.ok) {
+      const failure = new Error(json.error ?? 'Error del servidor') as Error & {
+        code?: string
+      }
+      failure.code = json.code
+      throw failure
+    }
+
+    if (typeof json.credits === 'number') setCredits(json.credits)
 
     const drafts = json.events ?? []
     if (drafts.length === 0) {
@@ -311,6 +379,16 @@ export default function App() {
           ))}
         </div>
 
+        <button
+          type="button"
+          className="credits-pill"
+          onClick={() => setBuyOpen(true)}
+          title="Comprar más análisis"
+        >
+          <strong>{credits === null ? '…' : credits}</strong>
+          <span>análisis</span>
+        </button>
+
         <div className="userbox">
           <span className="user-email" title={session.user.email ?? ''}>
             {session.user.email}
@@ -353,7 +431,11 @@ export default function App() {
         </main>
 
         <aside className="side">
-          <PlanInput onSubmit={handlePlan} />
+          <PlanInput
+            onSubmit={handlePlan}
+            credits={credits}
+            onBuy={() => setBuyOpen(true)}
+          />
           <p className="tip">
             Consejo: pulsa un evento para cambiar el nombre, la fecha o la hora.
           </p>
@@ -367,6 +449,14 @@ export default function App() {
           onClose={() => setEditing(null)}
           onSave={saveEvent}
           onDelete={deleteEvent}
+        />
+      )}
+
+      {buyOpen && (
+        <CreditsDialog
+          accessToken={session.access_token}
+          credits={credits}
+          onClose={() => setBuyOpen(false)}
         />
       )}
 
