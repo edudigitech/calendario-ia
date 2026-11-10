@@ -328,6 +328,10 @@ button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Aire arriba y abajo. Las etiquetas de hora van centradas sobre su línea
+     (translateY(-50%)), así que la de las 00:00 y la del final quedaban
+     cortadas por el borde del contenedor. */
+  padding: 16px 0 24px;
 }
 
 .timegrid-body {
